@@ -20,6 +20,9 @@ namespace ScoresPredictionsServer.Controllers
 
         public IActionResult Index()
         {
+            Scraper scraper = new Scraper();
+            scraper.Test();
+
             return View();
         }
 

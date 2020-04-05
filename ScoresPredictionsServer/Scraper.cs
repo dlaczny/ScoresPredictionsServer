@@ -1,0 +1,248 @@
+﻿using HtmlAgilityPack;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using ScoresPredictionsServer.Models;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+namespace ScoresPredictionsServer
+{
+    public class Scraper
+    {
+        public void Test()
+        {
+            List<string> scoreboardsForEachWeek = new List<string>();
+
+            List<string> movie1 = JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(@"C:\Users\laczn\OneDrive\Pulpit\json\nowe.json"));
+
+            List<string> vs = new List<string>() { "https://lol.gamepedia.com/LEC/2020_Season/Spring_Season/Scoreboards" };
+
+            scoreboardsForEachWeek = ScrapeScoreboardsLinks(@"https://lol.gamepedia.com/LEC/2020_Season/Spring_Season/Scoreboards").Result;
+
+            ScrapeScores(scoreboardsForEachWeek, "https://lol.gamepedia.com/LEC/2020_Season/Spring_Season/Scoreboards");
+        }
+
+        private async void ScrapeScores(List<string> weeks, string tournament)
+        {
+            foreach (var week in weeks)
+            {
+                var http = new HttpClient();
+                var html = await http.GetStringAsync(week);
+                var htmlDocument = new HtmlDocument();
+                htmlDocument.LoadHtml(html);
+
+                //var table = htmlDocument.DocumentNode.Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("mw-parser-output")).ElementAt(1).Descendants("table").Where(node => node.GetAttributeValue("class", "").Equals("sb"));
+
+                var content = htmlDocument.DocumentNode.Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("mw-parser-output")).ElementAt(1).Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("inline-content"));
+
+                foreach (var itemc in content)
+                {
+                    Encounter encounter = new Encounter();
+
+                    var tables = itemc.Descendants("table").Where(node => node.GetAttributeValue("class", "").Equals("sb"));
+
+                    //Look for teamId or create new team
+                    encounter.Team1Id = tables.First().Descendants("a").ToList()[0].Attributes["href"].Value;
+                    encounter.Team2Id = tables.First().Descendants("a").ToList()[2].Attributes["href"].Value;
+
+                    encounter.Tournament = tournament;
+
+                    var date = tables.ElementAt(5).Descendants("span").Where(node => node.GetAttributeValue("class", "").Equals("DateInLocal")).First().InnerText;
+                    encounter.Date = DateTime.ParseExact(date, "yyyy,M,dd,HH,mm", CultureInfo.InvariantCulture);
+                    encounter.Matches = new List<string>();
+
+                    if (tables.Count() == 1)
+                    {
+                        encounter.Format = "BO1";
+                    }
+                    else if (tables.Count() == 2 || tables.Count() == 3)
+                    {
+                        encounter.Format = "BO3/BO5";
+                    }
+                    else if (tables.Count() > 3)
+                    {
+                        encounter.Format = "BO5";
+                    }
+
+                    foreach (var item in tables)
+                    {
+                        Match match = new Match();
+
+                        var node = item.Descendants("tr").ToList();
+
+                        FillMatch(match, node);
+
+                        encounter.Matches.Add(match.Id.ToString());
+
+                        node.Count();
+
+                        //var team1Score = terki[1].Descendants("th").ToList()[0].InnerText;
+                        //var team2Score = terki[1].Descendants("th").ToList()[2].InnerText;
+
+                        if (node[2].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-header-vertict")).First().InnerText == "Victory")
+                        {
+                            //team1Win
+                        }
+                        else
+                        {
+                            //team2Win
+                        }
+
+                        //List<string> team1Players = new List<string>();
+                        //List<string> team2Players = new List<string>();
+
+                        //var players = terki[4].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-p-name")).ToList();
+
+                        //for (int i = 0; i < players.Count; i++)
+                        //{
+                        //    if (i < 5)
+                        //    {
+                        //        team1Players.Add(players[i].Descendants("a").First().Attributes["href"].Value);
+                        //    }
+                        //    else
+                        //    {
+                        //        team2Players.Add(players[i].Descendants("a").First().Attributes["href"].Value);
+                        //    }
+                        //}
+
+                        //var date = node[5].Descendants("span").Where(node => node.GetAttributeValue("class", "").Equals("DateInLocal")).First().InnerText;
+
+                        //2020,1,24,17,40
+                        //DateTime ad = DateTime.ParseExact(date, "yyyy,M,dd,HH,mm", CultureInfo.InvariantCulture);
+                    }
+                }
+            }
+        }
+
+        private static void FillMatch(Match match, List<HtmlNode> node)
+        {
+            if (node[2].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-header-vertict")).First().InnerText == "Victory")
+            {
+                match.WinningTeamId = node[0].Descendants("a").ToList()[0].Attributes["href"].Value;
+                match.LoosingTeamId = node[0].Descendants("a").ToList()[2].Attributes["href"].Value;
+
+                match.WinningTeamPlayers = new List<string>();
+                match.LoosingTeamPlayers = new List<string>();
+
+                var players = node[4].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-p-name")).ToList();
+
+                for (int i = 0; i < players.Count; i++)
+                {
+                    if (i < 5)
+                    {
+                        match.WinningTeamPlayers.Add(players[i].Descendants("a").First().Attributes["href"].Value);
+                    }
+                    else
+                    {
+                        match.LoosingTeamPlayers.Add(players[i].Descendants("a").First().Attributes["href"].Value);
+                    }
+                }
+            }
+            else
+            {
+                match.WinningTeamId = node[0].Descendants("a").ToList()[2].Attributes["href"].Value;
+                match.LoosingTeamId = node[0].Descendants("a").ToList()[0].Attributes["href"].Value;
+            }
+        }
+
+        private async Task<List<string>> ScrapeScoreboardsLinks(string tournament)
+        {
+            var url = tournament;
+
+            var http = new HttpClient();
+            var html = await http.GetStringAsync(url);
+            var htmlDocument = new HtmlDocument();
+            htmlDocument.LoadHtml(html);
+
+            var table = htmlDocument.DocumentNode.Descendants("div").Where(node => node.GetAttributeValue("class", "").Contains("tabheader-top"));
+
+            var urls = table.ElementAt(2).Descendants("a");
+
+            List<string> scoreboardsForEachWeek = new List<string>();
+            scoreboardsForEachWeek.Add(url);
+            foreach (var item in urls.Skip(1))
+            {
+                scoreboardsForEachWeek.Add(@"https://lol.gamepedia.com" + item.Attributes["href"].Value);
+            }
+            return scoreboardsForEachWeek;
+        }
+
+        private async void ScrapeTeams(List<string> tournaments)
+        {
+            ////List<Team> teams = new List<Team>();
+            //foreach (var tournament in tournaments)
+            //{
+            //    var url = "https://lol.gamepedia.com/" + tournament + "/2019_Season/Summer_Season";
+
+            //    var http = new HttpClient();
+            //    var html = await http.GetStringAsync(url);
+            //    var htmlDocument = new HtmlDocument();
+            //    htmlDocument.LoadHtml(html);
+
+            //    var table = htmlDocument.DocumentNode.Descendants("div").Where(node => node.GetAttributeValue("class", "").Contains("tournament-rosters maxteams")).
+            //    First().Descendants("tbody").ToList();
+
+            //    foreach (var item in table)
+            //    {
+            //        Team team = new Team();
+            //        var link = new HtmlDocument();
+            //        link.LoadHtml(item.InnerHtml);
+
+            //        string teamName = link.DocumentNode.Descendants("a").First().Attributes["href"].Value;
+
+            //        var teamUrl = @"https://lol.gamepedia.com" + teamName;
+
+            //        //var img = link.DocumentNode.Descendants("td").First(node => node.GetAttributeValue("class", "").Equals("tournament-roster-logo-cell")).
+            //        //    Descendants("img").First().Attributes["src"].Value;
+
+            //        //using (WebClient webClient = new WebClient())
+            //        //{
+            //        //    webClient.DownloadFile(img, @"C:\Users\laczn\Desktop\testt\" + teamName.Trim('/') + ".png");
+            //        //}
+
+            //        //Console.WriteLine(teamUrl);
+
+            //        var link2 = new HtmlDocument();
+            //        html = await http.GetStringAsync(teamUrl);
+            //        link2.LoadHtml(html);
+
+            //        team.Name = teamName.Trim('/');
+            //        team.League = tournament;
+            //        team.Players = new List<string>();
+            //        //team.ID = teamsList.Count();
+
+            //        try
+            //        {
+            //            var table2 = link2.DocumentNode.Descendants("table").Where(node => node.GetAttributeValue("class", "").Equals("wikitable")).First().Descendants("tr").ToList();
+
+            //            foreach (var player in table2.Skip(1))
+            //            {
+            //                var xxx = player.Descendants("td").ToList();
+
+            //                //string cos = xxx[2].InnerText.Trim().Replace("\n", "");
+            //                team.Players.Add(xxx[2].InnerText.Trim().Replace("\n", ""));
+            //                //Console.WriteLine(xxx[2].InnerText + " " + xxx[4].InnerText);
+            //            }
+
+            //            //team.Game = _gameRepository.GetGameID(game);
+
+            //            mongoDatabase.GetCollection<Team>("Teams").InsertOne(team);
+            //            //teamsList.Add(team);
+            //        }
+            //        catch (Exception ex)
+            //        {
+            //            Console.WriteLine(ex);
+            //        }
+            //    }
+        }
+
+        //Console.ReadLine();
+        //Final();
+        //}
+    }
+}
