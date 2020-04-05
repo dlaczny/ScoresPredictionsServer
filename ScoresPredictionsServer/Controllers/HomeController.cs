@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MongoDB.Driver;
 using ScoresPredictionsServer.Models;
 
 namespace ScoresPredictionsServer.Controllers
@@ -13,14 +15,18 @@ namespace ScoresPredictionsServer.Controllers
     {
         private readonly ILogger<HomeController> _logger;
 
-        public HomeController(ILogger<HomeController> logger)
+        private IMongoDatabase mongoDatabase;
+
+        public HomeController(ILogger<HomeController> logger, IOptions<Settings> options)
         {
             _logger = logger;
+            var client = new MongoClient(options.Value.ConnectionString);
+            mongoDatabase = client.GetDatabase(options.Value.Database);
         }
 
         public IActionResult Index()
         {
-            Scraper scraper = new Scraper();
+            Scraper scraper = new Scraper(mongoDatabase);
             scraper.Test();
 
             return View();

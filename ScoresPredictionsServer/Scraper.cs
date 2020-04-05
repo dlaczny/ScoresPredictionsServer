@@ -1,4 +1,7 @@
 ﻿using HtmlAgilityPack;
+using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ScoresPredictionsServer.Models;
@@ -14,8 +17,17 @@ namespace ScoresPredictionsServer
 {
     public class Scraper
     {
+        private IMongoDatabase mongoDatabase;
+
+        public Scraper(IMongoDatabase _mongoDatabase)
+        {
+            mongoDatabase = _mongoDatabase;
+        }
+
         public void Test()
         {
+            //GetTeamIdOfUrl("abc");
+
             List<string> scoreboardsForEachWeek = new List<string>();
 
             List<string> movie1 = JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(@"C:\Users\laczn\OneDrive\Pulpit\json\nowe.json"));
@@ -29,7 +41,7 @@ namespace ScoresPredictionsServer
 
         private async void ScrapeScores(List<string> weeks, string tournament)
         {
-            foreach (var week in weeks)
+            foreach (var week in weeks.Take(1))
             {
                 var http = new HttpClient();
                 var html = await http.GetStringAsync(week);
@@ -47,12 +59,12 @@ namespace ScoresPredictionsServer
                     var tables = itemc.Descendants("table").Where(node => node.GetAttributeValue("class", "").Equals("sb"));
 
                     //Look for teamId or create new team
-                    encounter.Team1Id = tables.First().Descendants("a").ToList()[0].Attributes["href"].Value;
-                    encounter.Team2Id = tables.First().Descendants("a").ToList()[2].Attributes["href"].Value;
+                    encounter.Team1Id = GetTeamIdOfUrl(tables.First().Descendants("a").ToList()[0].Attributes["href"].Value);
+                    encounter.Team2Id = GetTeamIdOfUrl(tables.First().Descendants("a").ToList()[2].Attributes["href"].Value);
 
                     encounter.Tournament = tournament;
 
-                    var date = tables.ElementAt(5).Descendants("span").Where(node => node.GetAttributeValue("class", "").Equals("DateInLocal")).First().InnerText;
+                    var date = tables.First().Descendants("span").Where(node => node.GetAttributeValue("class", "").Equals("DateInLocal")).First().InnerText;
                     encounter.Date = DateTime.ParseExact(date, "yyyy,M,dd,HH,mm", CultureInfo.InvariantCulture);
                     encounter.Matches = new List<string>();
 
@@ -77,21 +89,23 @@ namespace ScoresPredictionsServer
 
                         FillMatch(match, node);
 
+                        mongoDatabase.GetCollection<Match>("Matchs").InsertOne(match);
+
                         encounter.Matches.Add(match.Id.ToString());
 
-                        node.Count();
+                        //node.Count();
 
-                        //var team1Score = terki[1].Descendants("th").ToList()[0].InnerText;
-                        //var team2Score = terki[1].Descendants("th").ToList()[2].InnerText;
+                        ////var team1Score = terki[1].Descendants("th").ToList()[0].InnerText;
+                        ////var team2Score = terki[1].Descendants("th").ToList()[2].InnerText;
 
-                        if (node[2].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-header-vertict")).First().InnerText == "Victory")
-                        {
-                            //team1Win
-                        }
-                        else
-                        {
-                            //team2Win
-                        }
+                        //if (node[2].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-header-vertict")).First().InnerText == "Victory")
+                        //{
+                        //    //team1Win
+                        //}
+                        //else
+                        //{
+                        //    //team2Win
+                        //}
 
                         //List<string> team1Players = new List<string>();
                         //List<string> team2Players = new List<string>();
@@ -115,6 +129,8 @@ namespace ScoresPredictionsServer
                         //2020,1,24,17,40
                         //DateTime ad = DateTime.ParseExact(date, "yyyy,M,dd,HH,mm", CultureInfo.InvariantCulture);
                     }
+
+                    mongoDatabase.GetCollection<Encounter>("Encounters").InsertOne(encounter);
                 }
             }
         }
@@ -170,6 +186,43 @@ namespace ScoresPredictionsServer
                 scoreboardsForEachWeek.Add(@"https://lol.gamepedia.com" + item.Attributes["href"].Value);
             }
             return scoreboardsForEachWeek;
+        }
+
+        private string GetTeamIdOfUrl(string url)
+        {
+            Team team = new Team();
+            team.Url = url;
+            if (CollectionExistsAsync("Teams").Result)
+            {
+                if (mongoDatabase.GetCollection<Team>("Teams").FindAsync(x => x.Url.Equals(url)).Result.Any())
+                {
+                    return mongoDatabase.GetCollection<Team>("Teams").FindAsync(x => x.Url.Equals(url)).Result.First().ID.ToString();
+                }
+                else
+                {
+                    mongoDatabase.GetCollection<Team>("Teams").InsertOne(team);
+                    return mongoDatabase.GetCollection<Team>("Teams").FindAsync(x => x.Url.Equals(url)).Result.First().ID.ToString();
+                }
+            }
+            else
+            {
+                mongoDatabase.GetCollection<Team>("Teams").InsertOne(team);
+                return mongoDatabase.GetCollection<Team>("Teams").FindAsync(x => x.Url.Equals(url)).Result.First().ID.ToString();
+            }
+        }
+
+        private async Task<bool> CollectionExistsAsync(string collectionName)
+        {
+            var filter = new BsonDocument("name", collectionName);
+            //filter by collection name
+            var collections = await GetDatabase().ListCollectionsAsync(new ListCollectionsOptions { Filter = filter });
+            //check for existence
+            return await collections.AnyAsync();
+        }
+
+        private IMongoDatabase GetDatabase()
+        {
+            return mongoDatabase;
         }
 
         private async void ScrapeTeams(List<string> tournaments)
