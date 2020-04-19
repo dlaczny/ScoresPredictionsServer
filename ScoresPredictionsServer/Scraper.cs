@@ -140,7 +140,10 @@ namespace ScoresPredictionsServer
                         encounter.WinningTeamId = encounter.Team2Id;
                     }
 
-                    mongoDatabase.GetCollection<Encounter>("Encounters").InsertOne(encounter);
+                    if (!mongoDatabase.GetCollection<Encounter>("Encounters").AsQueryable().Any(x => x.Team1Id == encounter.Team1Id && x.Team2Id == encounter.Team2Id && x.Date == encounter.Date && x.WinningTeamId != null))
+                    {
+                        mongoDatabase.GetCollection<Encounter>("Encounters").InsertOne(encounter);
+                    }
                 }
             }
         }

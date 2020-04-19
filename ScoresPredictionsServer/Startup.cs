@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Hangfire;
 using Hangfire.Mongo;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -33,9 +34,12 @@ namespace ScoresPredictionsServer
             };
             var storageOptions = new MongoStorageOptions
             {
-                // ...
                 MigrationOptions = migrationOptions
             };
+            services.AddHangfire(config =>
+            {
+                config.UseMongoStorage(@"mongodb+srv://vanziom:nh5KM6m0NldvLhBc@gotdb-tdmxp.mongodb.net/ScoresDB?retryWrites=true", storageOptions);
+            });
 
             services.Configure<Settings>(
                 options =>
@@ -68,6 +72,9 @@ namespace ScoresPredictionsServer
             app.UseRouting();
 
             app.UseAuthorization();
+
+            app.UseHangfireServer();
+            app.UseHangfireDashboard();
 
             app.UseEndpoints(endpoints =>
             {

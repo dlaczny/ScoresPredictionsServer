@@ -19,6 +19,12 @@ namespace ScoresPredictionsServer.Models
         public bool Enabled { get; set; }
 
         [BsonElement]
-        public DateTime EndTime { get; set; }
+        public DateTime StartDate { get; set; }
+
+        [BsonElement]
+        public DateTime EndDate { get; set; }
+
+        [BsonElement]
+        public string Region { get; set; }
     }
 }

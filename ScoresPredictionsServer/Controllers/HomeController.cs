@@ -36,7 +36,11 @@ namespace ScoresPredictionsServer.Controllers
 
             //jobRepository.UpdateTeams();
 
-            jobRepository.UpdateIncommingEncounters();
+            //jobRepository.UpdateIncommingEncounters();
+
+            //jobRepository.AddTournaments();
+
+            jobRepository.UpdateScoresJob(mongoDatabase.GetCollection<Tournament>("Tournaments").AsQueryable().First());
 
             return View();
         }
