@@ -28,12 +28,15 @@ namespace ScoresPredictionsServer.Models
         public string WinningTeamPredictionId { get; set; }
 
         [BsonElement]
+        public double WinningTeamPredictionPercentage { get; set; }
+
+        [BsonElement]
         public string Tournament { get; set; }
 
         [BsonElement]
         public string Format { get; set; }
 
         [BsonElement]
-        public List<string> Matches { get; set; }
+        public List<Match> Matches { get; set; }
     }
 }

@@ -7,21 +7,18 @@ using System.Threading.Tasks;
 
 namespace ScoresPredictionsServer.Models
 {
-    public class Team
+    public class Tournament
     {
         [BsonId]
         public ObjectId ID { get; set; }
 
         [BsonElement]
-        public string Url { get; set; }
+        public string TournamentUrl { get; set; }
 
         [BsonElement]
-        public string LogoUrl { get; set; }
+        public bool Enabled { get; set; }
 
         [BsonElement]
-        public string Name { get; set; }
-
-        [BsonElement]
-        public string NameFromUrl { get; set; }
+        public DateTime EndTime { get; set; }
     }
 }

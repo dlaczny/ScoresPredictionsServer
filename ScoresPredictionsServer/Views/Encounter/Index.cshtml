@@ -1,0 +1,74 @@
+﻿@model EncounterVM
+
+@{
+    ViewData["Title"] = "EncounterList";
+}
+
+<h1>EncounterList</h1>
+
+<p>
+    <a asp-action="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().Date)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().Team1Id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().Team2Id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().WinningTeamId)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().WinningTeamPredictionId)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().Tournament)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Encounters.First().Format)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.Encounters)
+        {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Date)
+                </td>
+                <td>
+                    <img style="width:80px;" src="@Model.Teams.First(x=>x.ID.ToString() == item.Team1Id).LogoUrl" />
+                    @Model.Teams.First(x => x.ID.ToString() == item.Team1Id).Name
+                </td>
+                <td>
+                    <img style="width:80px;" src="@Model.Teams.First(x=>x.ID.ToString() == item.Team2Id).LogoUrl" />
+                    @Model.Teams.First(x => x.ID.ToString() == item.Team2Id).Name
+                </td>
+                <td>
+                    @Model.Teams.First(x => x.ID.ToString() == item.WinningTeamId).Name
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.WinningTeamPredictionId)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Tournament)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Format)
+                </td>
+                <td>
+                    @Html.ActionLink("Edit", "Edit", new { id = item.Id }) |
+                    @Html.ActionLink("Details", "Details", new { id = item.Id }) |
+                    @Html.ActionLink("Delete", "Delete", new { id = item.Id })
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

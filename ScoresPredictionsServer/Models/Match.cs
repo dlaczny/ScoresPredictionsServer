@@ -9,8 +9,8 @@ namespace ScoresPredictionsServer.Models
 {
     public class Match
     {
-        [BsonId]
-        public ObjectId Id { get; set; }
+        //[BsonId]
+        //public ObjectId Id { get; set; }
 
         [BsonElement]
         public string WinningTeamId { get; set; }

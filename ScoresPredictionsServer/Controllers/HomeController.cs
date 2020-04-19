@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using ScoresPredictionsServer.Models;
+using ScoresPredictionsServer.Repositories;
+using ScoresPredictionsServer.Repositories.Interfaces;
 
 namespace ScoresPredictionsServer.Controllers
 {
@@ -17,17 +19,24 @@ namespace ScoresPredictionsServer.Controllers
 
         private IMongoDatabase mongoDatabase;
 
-        public HomeController(ILogger<HomeController> logger, IOptions<Settings> options)
+        private IJobRepository jobRepository;
+
+        public HomeController(ILogger<HomeController> logger, IOptions<Settings> options, IJobRepository _jobRepository)
         {
             _logger = logger;
             var client = new MongoClient(options.Value.ConnectionString);
             mongoDatabase = client.GetDatabase(options.Value.Database);
+            jobRepository = _jobRepository;
         }
 
         public IActionResult Index()
         {
-            Scraper scraper = new Scraper(mongoDatabase);
-            scraper.Test();
+            //Scraper scraper = new Scraper(mongoDatabase);
+            //scraper.Test();
+
+            //jobRepository.UpdateTeams();
+
+            jobRepository.UpdateIncommingEncounters();
 
             return View();
         }

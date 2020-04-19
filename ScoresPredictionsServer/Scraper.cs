@@ -41,7 +41,7 @@ namespace ScoresPredictionsServer
 
         private async void ScrapeScores(List<string> weeks, string tournament)
         {
-            foreach (var week in weeks.Take(1))
+            foreach (var week in weeks)
             {
                 var http = new HttpClient();
                 var html = await http.GetStringAsync(week);
@@ -66,7 +66,7 @@ namespace ScoresPredictionsServer
 
                     var date = tables.First().Descendants("span").Where(node => node.GetAttributeValue("class", "").Equals("DateInLocal")).First().InnerText;
                     encounter.Date = DateTime.ParseExact(date, "yyyy,M,dd,HH,mm", CultureInfo.InvariantCulture);
-                    encounter.Matches = new List<string>();
+                    encounter.Matches = new List<Match>();
 
                     if (tables.Count() == 1)
                     {
@@ -80,7 +80,7 @@ namespace ScoresPredictionsServer
                     {
                         encounter.Format = "BO5";
                     }
-
+                    List<Match> matches = new List<Match>();
                     foreach (var item in tables)
                     {
                         Match match = new Match();
@@ -89,9 +89,10 @@ namespace ScoresPredictionsServer
 
                         FillMatch(match, node);
 
-                        mongoDatabase.GetCollection<Match>("Matchs").InsertOne(match);
+                        //mongoDatabase.GetCollection<Match>("Matchs").InsertOne(match);
 
-                        encounter.Matches.Add(match.Id.ToString());
+                        encounter.Matches.Add(match);
+                        matches.Add(match);
 
                         //node.Count();
 
@@ -130,17 +131,30 @@ namespace ScoresPredictionsServer
                         //DateTime ad = DateTime.ParseExact(date, "yyyy,M,dd,HH,mm", CultureInfo.InvariantCulture);
                     }
 
+                    if (matches.Where(x => x.WinningTeamId == encounter.Team1Id).Count() > matches.Where(x => x.WinningTeamId == encounter.Team2Id).Count())
+                    {
+                        encounter.WinningTeamId = encounter.Team1Id;
+                    }
+                    else
+                    {
+                        encounter.WinningTeamId = encounter.Team2Id;
+                    }
+
                     mongoDatabase.GetCollection<Encounter>("Encounters").InsertOne(encounter);
                 }
             }
         }
 
-        private static void FillMatch(Match match, List<HtmlNode> node)
+        private void FillMatch(Match match, List<HtmlNode> node)
         {
             if (node[2].Descendants("div").Where(node => node.GetAttributeValue("class", "").Equals("sb-header-vertict")).First().InnerText == "Victory")
             {
+                List<Team> teams = mongoDatabase.GetCollection<Team>("Teams").AsQueryable().ToList();
+
                 match.WinningTeamId = node[0].Descendants("a").ToList()[0].Attributes["href"].Value;
+                match.WinningTeamId = teams.First(x => x.Url == match.WinningTeamId).ID.ToString();
                 match.LoosingTeamId = node[0].Descendants("a").ToList()[2].Attributes["href"].Value;
+                match.LoosingTeamId = teams.First(x => x.Url == match.LoosingTeamId).ID.ToString();
 
                 match.WinningTeamPlayers = new List<string>();
                 match.LoosingTeamPlayers = new List<string>();
@@ -192,6 +206,9 @@ namespace ScoresPredictionsServer
         {
             Team team = new Team();
             team.Url = url;
+
+            team = ScrapeTeamDetails(team).Result;
+
             if (CollectionExistsAsync("Teams").Result)
             {
                 if (mongoDatabase.GetCollection<Team>("Teams").FindAsync(x => x.Url.Equals(url)).Result.Any())
@@ -209,6 +226,33 @@ namespace ScoresPredictionsServer
                 mongoDatabase.GetCollection<Team>("Teams").InsertOne(team);
                 return mongoDatabase.GetCollection<Team>("Teams").FindAsync(x => x.Url.Equals(url)).Result.First().ID.ToString();
             }
+        }
+
+        private async Task<Team> ScrapeTeamDetails(Team team)
+        {
+            var url = "https://lol.gamepedia.com" + team.Url;
+
+            team.NameFromUrl = team.Url.Trim('/').Replace("_", " ");
+
+            var http = new HttpClient();
+            var html = await http.GetStringAsync(url);
+            var htmlDocument = new HtmlDocument();
+            htmlDocument.LoadHtml(html);
+
+            var name = htmlDocument.DocumentNode.Descendants("th").Where(node => node.GetAttributeValue("class", "").Equals("infobox-title")).ToList().First().InnerText;
+
+            team.Name = name;
+
+            var http2 = new HttpClient();
+            var html2 = await http2.GetStringAsync(url);
+            var htmlDocument2 = new HtmlDocument();
+            htmlDocument.LoadHtml(html2);
+
+            var img = htmlDocument.DocumentNode.Descendants("a").Where(node => node.GetAttributeValue("class", "").Equals("image")).ToList().First().Descendants("img").First().Attributes["src"].Value;
+
+            team.LogoUrl = img;
+
+            return team;
         }
 
         private async Task<bool> CollectionExistsAsync(string collectionName)
